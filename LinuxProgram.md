@@ -127,6 +127,100 @@ int fcntl(int fd, int cmd, ...);
 
 * 文件描述符和打开文件之间的关系
 
-> 
+> ### inode
 
-	
+> 每个文件系统会为其上的所有文件建立一个i-node表，inode包含文件的元信息，具体有文件的字节数，文件拥有者ID,组ID,文件
+> 的权限，文件的时间戳，链接数即多少个文件名指向这个inode,文件数据block的位置。stat命令可以查看某个文件inode信息。
+
+```sh
+$ stat 文件名
+```
+> 除了文件名以外的所有信息都存在inode之中。inode也会消耗磁盘空间，在硬盘格式化的时候操作系统将硬盘分成两个区域。一个是
+> 数据区，存放文件数据，另一个是inode区(inode table),存放inode所包含的信息。
+
+```sh
+$ df -i
+```
+> df命令可以查看硬盘分区的inode的总数和已经使用的数量。由于每个文件都必须有一个inode，有可能发生inode已经用光，
+> 但是硬盘还未存满的情况。这时，就无法在硬盘上创建新文件。
+> ### indoe号码
+> 每个inode都有一个号码，操作系统用inode号码来识别不同的文件。Linux系统内部不使用文件名，而使用inode号码来识别文件。
+> 对于系统来说，文件名只是inode号码便于识别的别称。表面上，用户通过文件名，打开文件。实际上，系统内部这个过程分成三步：
+> 首先，系统找到这个文件名对应的inode号码；其次，通过inode号码，获取inode信息；最后，根据inode信息，找到文件数据所在
+> 的block，读出数据。
+> 使用ls -i命令，可以看到文件名对应的inode号码
+
+```sh
+$ ls -i 文件名
+```
+> ### 目录文件
+> 在Linux系统中，目录也是一种文件，打开目录实际上就是打开目录文件。目录文件就是一系列目录项（dirent）的列表。每个目录
+> 项，由两部分组成：所包含文件的文件名，以及该文件名对应的inode号码。目录文件的读权限（r）和写权限（w），都是针对目录
+> 文件本身。由于目录文件内只有文件名和inode号码，所以如果只有读权限，只能获取文件名，无法获取其他信息，因为其他信息都
+> 储存在inode节点中，而读取inode节点内的信息需要目录文件的执行权限（x）。
+> ### 硬链接
+> 一般情况下，文件名和inode号码是"一一对应"关系，每个inode号码对应一个文件名。但是，Linux系统允许，多个文件名指向同一
+> 个inode号码。这意味着，可以用不同的文件名访问同样的内容；对文件内容进行修改，会影响到所有文件名；但是，删除一个文件名，
+> 不影响另一个文件名的访问。这种情况就被称为"硬链接"。inode信息中有一项叫做"链接数"，记录指向该inode的文件名总数。当这个
+> 值减到0，表明没有文件名指向这个inode，系统就会回收这个inode号码，以及其所对应block区域。
+> ### 软链接
+> 文件A和文件B的inode号码虽然不一样，但是文件A的内容是文件B的路径。读取文件A时，系统会自动将访问者导向文件B。因此，无论
+> 打开哪一个文件，最终读取的都是文件B。这时，文件A就称为文件B的"软链接"。文件A依赖于文件B而存在，如果删除了文件B，打开文件A
+> 就会报错。这是软链接与硬链接最大的不同：文件A指向文件B的文件名，而不是文件B的inode号码，文件B的inode"链接数"不会因此发
+> 生变化。
+> ### 系统级打开文件表(open file table)
+> 内核对所有打开的文件维护一个系统级的描述表格，并将表中各条目称为打开文件句柄。一个打开文件句柄存储了与一个打开文件
+> 相关的全部信息，如下所示。
+> * 当前文件偏移量（调用read()和write()时更新，或使用lseek()直接修改。
+> * 打开文件时所用使用的状态标志
+> * 文件访问模式
+> * 对该文件inode对象引用
+> * 等等
+> 
+> ### 进程级的文件描述符表
+> 对于每个进程，内核为其维护打开文件的描述符表，该表的每一条目都记录了单个文件描述符的相关信息，如下所示。
+> * 控制文件描述符操作的一组标志。
+> * 对打开文件句柄的引用。
+
+> 如果两个文件描述符，指向同一个打开文件句柄，将共享同一文件偏移量。
+
+* 复制文件描述符
+
+```cpp
+#include <unistd.h>
+int dup(int oldfd);
+//Return file descriptor on success, or -1 on error
+```
+> dup()调用复制一个打开的文件描述符oldfd, 并返回一个新描述符，二者都指向同一打开的文件句柄。系统会保证新描述符一定是编号值
+> 最低的未使用文件描述符。
+
+```cpp
+#include <unistd.h>
+int dup2(int oldfd, int newfd);
+//Return new file descriptor on success, or -1 on error
+```
+> dup2()系统调用会为oldfd参数所指定的文件描述符创建副本，其编号由newfd参数指定。如果newfd参数所指定编号的文件描述符之前
+> 已经打开，那么dup2()会首先将其关闭。并会忽略newfd关闭期间出现的任何错误。
+
+* 在文件特定偏移量处的I/O，pread()和pwrite()
+
+> 系统调用pread()和pwrite(), 会在offset参数所指定的位置进行文件I/O操作，且它们不会改变文件的当前偏移量。
+
+```cpp
+#include <unistd.h>
+ssize_t pread(int fd, void* buf, size_t count, off_t offset);
+//Return numbers of bytes read, 0 on EOF, or -1 on error
+
+ssize_t pwrite(int fd, void* buf, size_t count, off_t offset);
+//Return number of bytes written, or -1 on error
+```
+> pread()调用等于将如下调用纳入同一原子操作：
+
+```cpp
+off_t orig;
+orig = lseek(fd, 0, SEEK_CUR);
+lseek(fd, offset, SEEK_SET);
+s = read(fd,buf, len);
+lseek(fd, orig, SEEK_SET);
+```
+> pwrite()类似
