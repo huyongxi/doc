@@ -225,5 +225,39 @@ void longjmp(jmp_buf env, int val);
 ```
 
 > setjmp()调用为后续由longjmp()调用执行的跳转确立了跳转目标。从编程角度来看，调用longjmp()函数后，看起来就和从第二次调用setjmp()返回时完全一样。通过查看setjmp()返回值，可以区分setjmp调用是初始返回还是第二次“返回”，初始调用返回0，后续“伪“返回的值为longjmp()调用中val参数。
->
-> p140
+
+# 内存分配
+
+* 在堆上分配内存
+
+> 进程可以通过增加堆的大小来分配内存，所谓堆是一段长度可变的连续虚拟内存，始于进程的未初始化数据段末尾。通常将堆的当前内存边界称为“program break"。
+> ### 调整program break：brk()和sbrk()
+> 改变堆的大小，其实就像命令内核改变进程的program break 位置一样。在program break 的位置抬升后，程序可以访问新分配区域内的任何内存地址，而此时物理内存页尚未分配。内核会在进程首次试图访问这些虚拟内存地址时自动分配新的物理内存页。
+
+```cpp
+#include <unistd.h>
+int brk(void* end_data_segment);
+void* sbrk(intptr_t increment);
+```
+> 系统调用brk()会将program break设置为参数end_data_segment所指定的位置。由于虚拟内存以页为单位进行分配，实际会四舍五入到下一个内存页边界。调用sbrk()将program break在原有地址上增加increment大小。若调用成功，sbrk()返回前一个program break的地址，如果program break增加，那么返回值是指向这块新分配内存起始位置的指针。
+> ### 在堆上分配内存：malloc()和free()
+
+```cpp
+#include <stdlib.h>
+void* malloc(size_t size);
+```
+> malloc()函数在堆上分配size个字节大小的内存（实际上会额外分配几个字节来存放这块内存的大小，位于内存块的起始处，给free()使用），并返回指向新分配内存起始位置处的指针，其所分配的内存未经初始化。
+
+```cpp
+#include <stdlib.h>
+void free(void* ptr);
+```
+> free()函数释放ptr参数所指向的内存块。一般情况下，free()并不降低program break的位置，而是将这块内存添加到空闲内存列表中，供后续的malloc()函数循环使用。
+> ### 在堆栈上分配内存：alloca()
+
+> 和malloc函数功能一样，alloca()也可以动态分配内存，不过是通过增加栈帧的大小从栈上分配。
+
+```cpp
+#include <alloca.h>
+void* alloca(size_t size);
+```
