@@ -485,7 +485,7 @@ vertical-align:1px;
 <p>Logic进程在玩家退出游戏（一段时间后，定时器）会触发事件EVENT_PLAYER_DESTROY，向SceneMgr进程发送LOGIC_MSG_LEAVE_SCENE消息<br>SceneMgr进程收到消息后，会删除相关数据，向Scene进程发送SCENEMGR_MSG_LEAVE_SCENE消息。<br>Sence进程收到消息后，删除玩家在场景中的对象和从AreaBase移除相关对象。</p>
 </blockquote>
 <p>如果玩家掉线，该玩家会触发事件EVENT_PLAYER_GATE_LOST，如果gate的进程和logic进程之间连接断掉，gate上的所有玩家都会触发该事件，相应的处理流程：</p>
-<p><img src="https://i.imgur.com/UcKeEOV.png" alt=""></p>
+<p><img src="https://i.imgur.com/nVCMYrq.png" alt=""></p>
 <blockquote>
 <p>Logic进程发送消息LOGIC_MSG_DISAPPEAR_SCENE<br>SceneMgr进程收到消息后，发送SCENEMGR_MSG_DISAPPEAR_SCENE消息<br>Scene进程收到消息后，从AreaBase移除相关对象。</p>
 </blockquote>

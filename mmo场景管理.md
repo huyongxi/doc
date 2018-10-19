@@ -10,7 +10,6 @@ mmo场景处理主要在Logic进程，SceneMgr进程，Scene进程。
 > Scene进程在收到SCENEMGR_MSG_CREATE_SCENE消息后，如果场景不存在就会创建一个场景对象，设置相关属性。创建场景相关的AreaBase对象(用于刷新视野）触发一些事件。收到SCENEMGR_MSG_ENTER_SCENE消息，主要创建一个场景单元对象，设置一些属性。触发一些事件。
 
 
-
 客户端进入游戏时会向服务器发送CLIENT_MSG_ENTER_SCENE消息，相关处理流程如下图所示：
 
 ![](https://i.imgur.com/B5QGJJX.png)
@@ -31,7 +30,7 @@ mmo场景处理主要在Logic进程，SceneMgr进程，Scene进程。
 
 如果玩家掉线，该玩家会触发事件EVENT_PLAYER_GATE_LOST，如果gate的进程和logic进程之间连接断掉，gate上的所有玩家都会触发该事件，相应的处理流程：
 
-![](https://i.imgur.com/UcKeEOV.png)
+![](https://i.imgur.com/nVCMYrq.png)
 
 >Logic进程发送消息LOGIC_MSG_DISAPPEAR_SCENE
 >SceneMgr进程收到消息后，发送SCENEMGR_MSG_DISAPPEAR_SCENE消息
