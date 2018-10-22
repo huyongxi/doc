@@ -358,3 +358,157 @@ void* alloca(size_t size);
 
 # 信号
 
+> 信号是事件发生时对进程的通知机制。有时也称为软件中断，信号因某些事件而产生。信号产生后，会稍后被传递给某一进程，而进程也会采取某些措施来响应信号。在产生和到达期间，信号处于等待(pending)状态。
+> 通常，一旦内核接下来要调度该进程运行，等待信号会马上送达，或者如果进程在运行，则会立即传递信号（如进程向自己发送信号）。然而，有时候需要确保一段代码不为传递来的信号所中断。为了做的这一点，可以将信号添加到进程的信号掩码中，会阻塞该组信号的到达。如果所产生的信号属于阻塞之列，那么信号将保持等待状态，直至稍后对其解除阻塞。
+> 信号到达后，进程视具体信号执行如下默认操作
+> * 忽略信号： 内核将信号丢弃，信号对进程没有产生任何影响。
+> * 终止进程
+> * 产生核心转储文件，同时进程终止：核心转储文件包含进程虚拟内存的镜像，可将其加载到调速器中以检查进程终止时的状态。
+> * 停止进程：暂停进程的执行。
+> * 于之前暂停后再度恢复进程的执行。
+> 除了根据特定信号而采取默认行为外，程序也能改变信号到达时的响应行为。也称为对信号的处置设置。程序可以将对信号的处置设置为如下之一。
+> * 采取默认行为：这适用于撤销对之前对信号设置的修改，恢复其默认处置的场景。
+> * 忽略信号：这适用默认行为为终止进程的信号。
+> * 执行信号处理程序
+
+
+* 信号类型和默认行为
+
+
+> SIGABRT：当进程调用abort()函数时，系统向进程发送该信号。默认情况下，该信号会终止进程，并产生核心转储文件。
+> SIGALRM：经调用alarm()或setitimer()而设置的实时定时器一旦到期，内核将产生该信号。
+> SIGBUS：产生该信号，即表示发送了某种内存错误，当使用由mmap()所创建的内存映射时，如果试图访问的地址超出了底层内存映射文件的结尾，那么将产生该错误。
+> SIGCHLD：当父进程的某一子进程终止时，内核将向父进程发送该信号。
+> SIGCLD：与SIGCHLD信号同义。
+> SIGCONT：该信号发送给已停止的进程，进程将会恢复运行（即在之后的某个时间点重新获得调度）。
+> SIGFPE：该信号因特定类型的算术错误而产生，比如除以0。
+> SIGINT：当用户键入终端中断字符（通常为Control-C),该信号的默认行为是终止进程。
+> SIGIO：利用fcntl()系统调用,可于特定类型（入终端和套接字）的打开文件描述符发送I/O事件时产生该信号。
+> SIGKILL：此信号，程序无法将其阻塞，忽略或者捕获，故而总能终止进程。
+> SIGSEGV：这一信号非常常见，当应用程序对内存的引用无效时，就会产生该信号。
+> SIGSTOP：这是一个必停信号，程序无法将其阻塞，忽略或者捕获，故而总能停止进程。
+> SIGSYS：如果进程发起的系统调用有误，那么将产生该信号。
+> SIGTERM：这是用来终止进程的标准信号，也是kill和killall命令所发生的默认信号。
+> SIGTRAP：该信号用来实现断点调试功能以及strace命令所执行的跟踪系统调用功能。
+> SIGURG：系统发送该信号给进程，表示套接字上存在紧急数据。
+> SIGPIPE：管道断开，默认终止进程。
+> 等等
+
+* 改变信号的处理：signal()
+
+> UNIX系统提供了两种方法改变信号处理：signal()和sigaction()
+
+```cpp
+#include <signal.h>
+void (*signal(int sig, void (*handler)(int))) (int);
+//Return previous signal disposition on success, or SIG_ERR on error
+//类似如下定义
+typedef void (*sighandler_t)(int);
+sighandler_t signal(int sig, sighandler_t handler);
+```
+> 第一个参数sig，标识希望修改处置的信号编号，第二个参数handler，则标识信号抵达时所调用的函数地址。signal()的返回值是之前的信号处理函数，像handler参数一样，是一个指针，指向的是带有一个整型参数且无返回值得参数。在为signal()指定handler参数时，可以用如下值来代替函数地址。
+> SIG_DFL：将信号处置重置为默认值。
+> SIG_IGN：忽略该信号
+
+* 发送信号：kill()
+
+```cpp
+#include <signal.h>
+int kill(pid_t pid, int sig);
+```
+> pid 参数标识一个或多个目标进程，而sig则指定要发送的信号。
+
+* 发送信号的其他方式：raise()和killpg()
+
+```cpp
+#include <signal.h>
+int raise(int sig);
+```
+> 在单进程程序中，调用raise()，相当于对kill()的调用：
+> kill(getpid(), sig);
+> 支持线程的系统会将raise()实现为：
+> pthread_kill(pthread_self(), sig)
+> pthread_kill()意味着将信号传递给调用raise()的特定线程。而kill()调用会发送一个信号给调用进程，并可将该信号传递给该进程的任一线程。
+
+* 信号集
+
+> 许多信号相关的系统调用都需要能表示一组不同的信号。多个信号可以使用一个称之为信号集的数据结构来表示，其系统数据类型为sigset_t。
+
+```cpp
+#include <signal.h>
+int sigemptyset(sigset_t* set);
+int sigfillset(sigset_t* set);
+//both return 0 on success, or -1 on error
+```
+
+> sigemptyset()函数初始化一个未包含任何成员的信号集。sigfillset()函数则初始化一个信号集，使其包含所有信号。必须使用sigemptyset()或者sigfillset()来初始化信号集。
+
+```cpp
+#include <signal.h>
+int sigaddset(sigset_t* set, int sig);
+int sigdelset(sigset_t* set, int sig);
+```
+> sigaddset()和sigdelset()向一个集合中添加或者移除单个信号。
+
+```cpp
+#include <signal.h>
+int sigismember(const sigset_t* set, int sig);
+```
+> 如果sig是set的一个成员，那么sigismember()函数将返回1(true),否则返回0(false)。
+
+* 信号掩码（阻止信号传递）
+
+> 内核会为每个进程维护一个信号掩码，即一组信号，并将阻塞其针对该进程的传递。如果将遭阻塞的信号发送给某个进程，那么对该信号的传递将延后，直至从进程信号掩码中移除该信号，从而解除阻塞为止。信号掩码实际属于线程属性，在多线程进程中，每个线程都可以使用pthread_sigmask()函数来独立检查和修改其信号掩码。
+> 向信号掩码中添加一个信号，有如下几种方式。
+> 但调用信号处理函数时，可将引发调用的信号自动添加到信号掩码中，是否发生这一情况，要视sigaction()所使用的标准而定。
+> 使用sigaction()函数设置信号处理函数时，可以指定一组额外信号，当调用该处理函数时将其阻塞。
+> 使用sigprocmask()系统调用，随时可以显式的向信号掩码中添加或者移除信号。
+
+```cpp
+#include <signal.h>
+int sigprocmask(int how, const sigset_t* set, sigset_t* oldset);
+```
+> how 参数指定了sigprocmask()函数想给信号掩码带来的变化。
+> SIG_BLOCK,将set指向信号集内的信号添加到掩码中。
+> SIG_UNBLOCK，将set指向信号集中的信号从信号掩码中移除。
+> SIG_SETMASK，将set指向的信号集赋给信号掩码。
+
+* 处于等待状态的信号
+
+> 如果进程收到一个该进程正在阻塞的信号，那么该信号会添加到进程的等待信号集中，当解除对该信号的锁定时，会随之将该信号传递给此进程，可以使用sigpending()确定进程中处于等待状态的是哪些信号。
+
+```cpp
+#include <signal.h>
+int sigpending(sigset_t* set);
+```
+> sigpending()系统调用返回处于等待状态的信号集。
+
+* 不对信号处理进行排队处理
+
+> 等待信号集只是一个掩码，仅表明一个信号是否发生，而未表明其发生的次数。如果同一信号在阻塞状态下产生多次，那么会将该信号记录在等待信号集中，并在稍后仅传递一次。
+
+* 改变信号处理函数：sigaction()
+
+> 虽然sigaction()的用法比之前signal()更为复杂，当也更具灵活性和可移植性。
+
+```cpp
+#include <signal.h>
+int sigaction(int sig, const struct sigaction* act, struc sigaction* oldact);
+//return 0 on success, or -1 on error
+```
+> sig 参数标识想要获取或改变的信号编号。该参数可以是除去SIGKILL和SIGSTOP之外的任何信号。
+> act 参数是一枚指针，指向描述信号新处理的数据结构，如果仅对信号现有的处置感兴趣，可将该参数设为NULL。oldact参数用来返回之前信号处置的相关信息，如无意获取此类信息，可设为NULL。act和oldact所指向的结构类型如下所示：
+```cpp
+strcut sigaction {
+	void (*sa_handler)(int);
+	sigset_t sa_mask;
+	int sa_flags;
+	void (*sa_restorer)(void);
+};
+```
+
+# 信号处理器函数
+
+* 可重入函数和异步信号安全函数
+
+> 如果同一个进程的多条线程可以同时安全的调用某一函数，那么该函数就是可重入的。此处的“安全”意味着，无论其他线程调用该函数的执行状态如何，函数均可产生预期结果。更新全局变量或静态数据结构的函数可能是不可重入的，只用到本地变量的函数肯定是可重入的。
