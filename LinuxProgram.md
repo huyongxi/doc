@@ -250,6 +250,187 @@ FILE* fdopen(int fd, const char* mode);
 
 * 监控文件事件
 
+# C++中文件操作
+
+![](https://i.imgur.com/QiEUkOq.png)
+
+* fstream
+
+> ofstream 文件写操作，内存写入存储设备。ifstream 文件读操作，存储设备读到内存中。fstream 对打开的文件进行读写操作。
+
+* 打开文件
+
+> 文件流通过构造函数或者调用open()与文件进行关联
+
+```cpp
+void open ( const char * filename,
+            ios_base::openmode mode = ios_base::in | ios_base::out );
+```
+> 参数filename 操作文件名，mode文件的打开方式。打开方式在ios类中定义，有如下几种方式：
+
+| 方式 | 描述 |
+| ----- | ----- |
+| ios::in | 为输入（读）而打开文件 |
+| ios::out | 为输出（写）而打开文件 |
+| ios::ate | 初始位置：文件尾 |
+| ios::app | 所有输出附加在文件末尾 |
+| ios::trunc | 如果文件已存在则先删除该文件 |
+| ios::binary | 二进制方式 |
+
+> 这些方式是能够进行组合使用，以或运算(|)的方式。
+
+* 关闭文件
+
+> 当文件读写操作完成之后，我们必须将文件关闭以使文件重新变为可访问的。成员函数close()，它负责将缓存中的数据排放出来并关闭文件。这个函数一旦被调用，原先的流对象就可以被用来打开其它的文件了，这个文件也就可以重新被其它的进程所访问了。为防止流对象被销毁时还联系着打开的文件，析构函数将会自动调用关闭函数close。
+
+* 文本文件的读写
+
+```cpp
+     // writing on a text file
+    #include <fstream.h>
+    int main () {
+        ofstream out("out.txt");
+        if (out.is_open()) 
+       {
+            out << "This is a line.\n";
+            out << "This is another line.\n";
+            out.close();
+        }
+        return 0;
+    }
+   //结果: 在out.txt中写入：
+   This is a line.
+   This is another line 
+
+```
+```cpp
+ // reading a text file
+    #include <iostream.h>
+    #include <fstream.h>
+    #include <stdlib.h>
+    
+    int main () {
+        char buffer[256];
+        ifstream in("test.txt");
+        if (! in.is_open())
+        { cout << "Error opening file"; exit (1); }
+        while (!in.eof() )
+        {
+            in.getline (buffer,100);
+            cout << buffer << endl;
+        }
+        return 0;
+    }
+    //结果 在屏幕上输出
+     This is a line.
+     This is another line
+
+```
+
+> 上面的例子读入一个文本文件的内容，然后将它打印到屏幕上。注意我们使用了一个新的成员函数叫做eof ，它是ifstream 从类 ios 中继承过来的，当到达文件末尾时返回true。
+> 除了eof()以外，还有一些验证流的状态的成员函数（所有都返回bool型返回值）：
+> bad()：如果在读写过程中出错，返回 true 。例如：当我们要对一个不是打开为写状态的文件进行写入时，或者我们要写入的设备没有剩余空间的时候。
+> fail()：除了与bad() 同样的情况下会返回 true 以外，加上格式错误时也返回true ，例如当想要读入一个整数，而获得了一个字母的时候。
+> eof()：如果读文件到达文件末尾，返回true。
+> good()：这是最通用的：如果调用以上任何一个函数返回true 的话，此函数返回 false 。
+> 要想重置以上成员函数所检查的状态标志，你可以使用成员函数clear()，没有参数。
+
+* 获取和设置流指针
+
+> 所有输入/输出流对象(i/o streams objects)都有至少一个流指针：
+> ifstream， 类似istream, 有一个被称为get pointer的指针，指向下一个将被读取的元素。ofstream, 类似 ostream, 有一个指针 put pointer ，指向写入下一个元素的位置。fstream, 类似 iostream, 同时继承了get 和 put。我们可以通过使用以下成员函数来读出或配置这些指向流中读写位置的流指针：
+> tellg() 和 tellp() 这两个成员函数不用传入参数，返回pos_type 类型的值(根据ANSI-C++ 标准) ，就是一个整数，代表当前get 流指针的位置 (用tellg) 或 put 流指针的位置(用tellp).
+> seekg() 和seekp() 这对函数分别用来改变流指针get 和put的位置。两个函数都被重载为两种不同的原型：
+> seekg ( pos_type position );
+> seekp ( pos_type position );
+> 使用这个原型，流指针被改变为指向从文件开始计算的一个绝对位置。要求传入的参数类型与函数 tellg 和tellp 的返回值类型相同。
+> seekg ( off_type offset, seekdir direction );
+> seekp ( off_type offset, seekdir direction );
+> 使用这个原型可以指定由参数direction决定的一个具体的指针开始计算的一个位移(offset)。它可以是：
+
+| 参数 | 描述 |
+| ----- | ----- |
+| ios::beg | 从流开始位置计算的位移 |
+| ios::cur | 从流指针当前位置开始计算的位移 |
+| ios::end | 从流末尾处开始计算的位移 |
+
+> 流指针 get 和 put 的值对文本文件(text file)和二进制文件(binary file)的计算方法都是不同的，因为文本模式的文件中某些特殊字符可能被修改。由于这个原因，建议对以文本文件模式打开的文件总是使用seekg 和 seekp的第一种原型，而且不要对tellg 或 tellp 的返回值进行修改。对二进制文件，你可以任意使用这些函数，应该不会有任何意外的行为产生。
+
+> 以下例子使用这些函数来获得一个二进制文件的大小：
+
+```cpp
+ // obtaining file size
+    #include <iostream.h>
+    #include <fstream.h>
+    
+    const char * filename = "test.txt";
+    
+    int main () {
+        long l,m;
+        ifstream in(filename, ios::in|ios::binary);
+        l = in.tellg();
+        in.seekg (0, ios::end);
+        m = in.tellg();
+        in.close();
+        cout << "size of " << filename;
+        cout << " is " << (m-l) << " bytes.\n";
+        return 0;
+    }
+   
+   //结果:
+   size of example.txt is 40 bytes.
+
+```
+
+* 二进制文件
+
+> 在二进制文件中，使用<< 和>>，以及函数（如getline）来操作符输入和输出数据，没有什么实际意义，虽然它们是符合语法的。
+
+> 文件流包括两个为顺序读写数据特殊设计的成员函数：write 和 read。第一个函数 (write) 是ostream 的一个成员函数，都是被ofstream所继承。而read 是istream 的一个成员函数，被ifstream 所继承。类 fstream 的对象同时拥有这两个函数。它们的原型是：
+
+> write ( char * buffer, streamsize size );
+> read ( char * buffer, streamsize size );
+> 这里 buffer 是一块内存的地址，用来存储或读出数据。参数size 是一个整数值，表示要从缓存（buffer）中读出或写入的字符数。
+
+```cpp
+// reading binary file
+    #include <iostream>
+    #include <fstream.h>
+    
+    const char * filename = "test.txt";
+    
+    int main () {
+        char * buffer;
+        long size;
+        ifstream in (filename, ios::in|ios::binary|ios::ate);
+        size = in.tellg();
+        in.seekg (0, ios::beg);
+        buffer = new char [size];
+        in.read (buffer, size);
+        in.close();
+        
+        cout << "the complete file is in a buffer";
+        
+        delete[] buffer;
+        return 0;
+    }
+    //运行结果：
+    The complete file is in a buffer
+
+```
+
+* 缓存和同步(Buffers and Synchronization)
+
+> 当我们对文件流进行操作的时候，它们与一个streambuf 类型的缓存(buffer)联系在一起。这个缓存（buffer）实际是一块内存空间，作为流(stream)和物理文件的媒介。例如，对于一个输出流， 每次成员函数put (写一个单个字符)被调用，这个字符不是直接被写入该输出流所对应的物理文件中的，而是首先被插入到该流的缓存（buffer）中。
+
+> 当缓存被排放出来(flush)时，它里面的所有数据或者被写入物理媒质中（如果是一个输出流的话），或者简单的被抹掉(如果是一个输入流的话)。这个过程称为同步(synchronization)，它会在以下任一情况下发生：
+> 当文件被关闭时: 在文件被关闭之前，所有还没有被完全写出或读取的缓存都将被同步。
+> 当缓存buffer 满时:缓存Buffers 有一定的空间限制。当缓存满时，它会被自动同步。
+> 控制符明确指明:当遇到流中某些特定的控制符时，同步会发生。这些控制符包括：flush 和endl。
+> 明确调用函数sync(): 调用成员函数sync() (无参数)可以引发立即同步。这个函数返回一个int 值，等于-1 表示流没有联系的缓存或操作失败。
+
+
+
 # 进程
 
 >进程是由内核定义的抽象的实体，并为该实体分配用以执行程序的各项系统资源。从内核角度看，进程由用户内存空间和一系列内核数据结构组成，用户内存空间包含了程序的代码以及代码使用的变量，而内核数据结构则用于维护进程的状态信息。包括许多与进程相关的标识号(IDs)、虚拟内存表、打开文件的描述符表、信号传递以及处理的有关信息、进程资源使用以及限制、当前工作目录和大量的其他信息。
@@ -604,3 +785,114 @@ strcut sigaction {
 * 可重入函数和异步信号安全函数
 
 > 如果同一个进程的多条线程可以同时安全的调用某一函数，那么该函数就是可重入的。此处的“安全”意味着，无论其他线程调用该函数的执行状态如何，函数均可产生预期结果。更新全局变量或静态数据结构的函数可能是不可重入的，只用到本地变量的函数肯定是可重入的。
+
+# cmake使用
+
+* 什么是CMake
+
+> CMake它允许开发者编写一种平台无关的 CMakeList.txt 文件来定制整个编译流程，然后再根据目标用户的平台进一步生成所需的本地化 Makefile 和工程文件，如 Unix 的 Makefile 或 Windows 的 Visual Studio 工程。从而做到“Write once, run everywhere”。
+
+> 在 linux 平台下使用 CMake 生成 Makefile 并编译的流程如下：
+1. 编写 CMake 配置文件 CMakeLists.txt 。
+2. 执行命令 cmake PATH 或者 ccmake PATH 生成 Makefile。其中， PATH CMakeLists.txt 所在的目录。
+3. 使用 make 命令进行编译。
+
+* 单个源文件
+
+> 例如，假设现在我们的项目中只有一个源文件 main.cc。编写CMakeLists.txt，并保存在与 main.cc 源文件同个目录下：
+
+```cpp
+# CMake 最低版本号要求
+cmake_minimum_required (VERSION 2.8)
+# 项目信息
+project (Demo1)
+# 指定生成目标
+add_executable(Demo main.cc)
+```
+> CMakeLists.txt 的语法比较简单，由命令、注释和空格组成，其中命令是不区分大小写的。符号 # 后面的内容被认为是注释。命令由命令名称、小括号和参数组成，参数之间使用空格进行间隔。对于上面的 CMakeLists.txt 文件，依次出现了几个命令：
+1. cmake_minimum_required：指定运行此配置文件所需的 CMake 的最低版本；
+2. project：参数值是 Demo1，该命令表示项目的名称是 Demo1 。
+3. add_executable： 将名为 main.cc 的源文件编译成一个名称为 Demo 的可执行文件。
+
+
+> 编译项目,之后，在当前目录执行 cmake . ，得到 Makefile 后再使用 make 命令编译得到 Demo1 可执行文件。
+
+* 多个源文件
+
+> 上面的例子只有单个源文件。现在假如把 power 函数单独写进一个名为 MathFunctions.c 的源文件里，使得这个工程变成如下的形式：
+
+```cpp
+./Demo2
+    |
+    +--- main.cc
+    |
+    +--- MathFunctions.cc
+    |
+    +--- MathFunctions.h
+
+```
+> 这个时候，CMakeLists.txt 可以改成如下的形式：
+
+```cpp
+# CMake 最低版本号要求
+cmake_minimum_required (VERSION 2.8)
+# 项目信息
+project (Demo2)
+# 指定生成目标
+add_executable(Demo main.cc MathFunctions.cc)
+```
+> 唯一的改动只是在 add_executable 命令中增加了一个 MathFunctions.cc 源文件。这样写当然没什么问题，但是如果源文件很多，把所有源文件的名字都加进去将是一件烦人的工作。更省事的方法是使用 aux_source_directory 命令，该命令会查找指定目录下的所有源文件，然后将结果存进指定变量名。其语法如下：
+
+```cpp
+aux_source_directory(<dir> <variable>)
+```
+
+> 因此，可以修改 CMakeLists.txt 如下：
+
+```cpp
+# CMake 最低版本号要求
+cmake_minimum_required (VERSION 2.8)
+# 项目信息
+project (Demo2)
+# 查找当前目录下的所有源文件
+# 并将名称保存到 DIR_SRCS 变量
+aux_source_directory(. DIR_SRCS)
+# 指定生成目标
+add_executable(Demo ${DIR_SRCS})
+```
+
+> 这样，CMake 会将当前目录所有源文件的文件名赋值给变量 DIR_SRCS ，再指示变量 DIR_SRCS 中的源文件需要编译成一个名称为 Demo 的可执行文件。
+
+* 多个目录，多个源文件
+
+> 现在进一步将 MathFunctions.h 和 MathFunctions.cc 文件移动到 math 目录下。
+
+```cpp
+./Demo3
+    |
+    +--- main.cc
+    |
+    +--- math/
+          |
+          +--- MathFunctions.cc
+          |
+          +--- MathFunctions.h
+```
+
+> 对于这种情况，需要分别在项目根目录 Demo3 和 math 目录里各编写一个 CMakeLists.txt 文件。为了方便，我们可以先将 math 目录里的文件编译成静态库再由 main 函数调用。根目录中的 CMakeLists.txt ：
+
+```cpp
+# CMake 最低版本号要求
+cmake_minimum_required (VERSION 2.8)
+# 项目信息
+project (Demo3)
+# 查找当前目录下的所有源文件
+# 并将名称保存到 DIR_SRCS 变量
+aux_source_directory(. DIR_SRCS)
+# 添加 math 子目录
+add_subdirectory(math)
+# 指定生成目标 
+add_executable(Demo main.cc)
+# 添加链接库
+target_link_libraries(Demo MathFunctions)
+```
